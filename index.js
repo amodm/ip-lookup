@@ -55,7 +55,7 @@ function textView(data, cacheSecs = 0) {
   const ip = data["ip"];
 
   const cache = cacheSecs > 0 ? `max-age=${cacheSecs}` : "no-cache";
-  const headers = new Headers({ 'Content-Type': 'application/plain;charset=utf-8', 'Cache-Control': cache });
+  const headers = new Headers({ 'Content-Type': 'text/plain;charset=utf-8', 'Cache-Control': cache });
   return new Response(`${ip}\n`, { headers });
 }
 
