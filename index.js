@@ -111,7 +111,7 @@ async function fetchIPDetails(ip, country, includeNetwork) {
 async function getIP4Network(ip, country) {
   const v4PrefixLen = 12; // number of most significant bits used to get the ip db partition
   const ipU32 = ipv4stoi(ip);
-  const partitionKey = ipU32 >> (32 - v4PrefixLen);
+  const partitionKey = (ipU32 >> (32 - v4PrefixLen)) & parseInt(Array(v4PrefixLen).fill('1').join(''), 2);
   const db = await IP2NETWORK.get(`m${v4PrefixLen}/v4/${partitionKey}`);
   let bestMatch = null;
   if (db) {
@@ -192,8 +192,7 @@ function ipv4itos(ip) {
  * Convert an IPv4 octet notation to a u32
  */
 function ipv4stoi(ip) {
-  const arr = ip.split('.').map(x => parseInt(x));
-  return arr[0]<<24 | arr[1]<<16 | arr[2]<<8 | arr[3];
+  return parseInt(ip.split('.').map(x => parseInt(x).toString(16)).join(''), 16);
 }
 
 /**
