@@ -1,0 +1,9 @@
+name = "ip-lookup"
+type = "javascript"
+account_id = ""
+workers_dev = false
+route = "ip.rootnet.in/*"
+zone_id = ""
+kv-namespaces = [
+	 { binding = "IP2NETWORK", id = "" }
+]
