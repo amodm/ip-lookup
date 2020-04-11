@@ -12,21 +12,23 @@ async function handleRequest(request) {
   const ip = request.headers.get('CF-Connecting-IP');
   const country = request.headers.get('CF-IPCountry');
 
+  let pathMatch;
   if (path === '/') {
     return textView(await fetchIPDetails(ip, country, false), 0);
   }
   else if (path === '/json') {
     return jsonView(await fetchIPDetails(ip, country, false), 0);
   }
-  else if (path.startsWith('/lookup')) {
-    const arr = path.split('/');
-    const providedIp = arr.length > 2 ? arr[2] : ip;
-    if (!providedIp.match(/^\d+\.\d+\.\d+\.\d+$/g) && !providedIp.match(/^[a-f0-9:]+$/g)) {
-      return errorView(404, 'Invalid lookup key', true);
-    }
-    const c = arr.length > 2 ? undefined : country;
-    const cacheSecs = arr.length > 2 ? 3600 : 0;
-    return jsonView(await fetchIPDetails(providedIp, c, true), cacheSecs);
+  else if ((pathMatch = path.match(/^\/as\/(\d+)$/)) || (pathMatch = path.match(/^\/lookup\/as(\d+)$/))) {
+    const asData = await fetchASDetails(parseInt(pathMatch[1]));
+    return asData ? jsonView(asData, 0) : errorView(404, 'Not found', true);
+  }
+  else if ((pathMatch = path.match(/^\/lookup(\/(\d+\.\d+\.\d+\.\d+))?$/)) ||
+      (pathMatch = path.match(/^\/lookup(\/([a-f0-9:]+))?$/))) {
+    const providedIp = pathMatch[2];
+    const c = providedIp ? undefined : country;
+    const cacheSecs = providedIp ? 3600 : 0;
+    return jsonView(await fetchIPDetails(providedIp || ip, c, true), cacheSecs);
   }
   else {
     return errorView(404, 'Not found', true);
@@ -66,6 +68,18 @@ function jsonView(data, cacheSecs = 0) {
   const cache = cacheSecs > 0 ? `max-age=${cacheSecs}` : "no-cache";
   const headers = new Headers({ 'Content-Type': 'application/json;charset=utf-8', 'Cache-Control': cache });
   return new Response(JSON.stringify(data, null, 2), { headers });
+}
+
+/**
+ * Returns ASN data for the required asn from the DB
+ */
+async function fetchASDetails(asn) {
+  const db = await IP2NETWORK.get(`asn/v1/${asn}`);
+  if (db) {
+    return JSON.parse(db);
+  } else {
+    return undefined;
+  }
 }
 
 /**
@@ -163,7 +177,7 @@ async function getIP6Network(ip, country) {
 }
 
 function getNetworkRecord(ip, country, networkStart, networkEnd, asn, asName, asCountry) {
-  return { ip, country, networkStart, networkEnd, asn, asName, asCountry };
+  return { ip, country, network: {start: networkStart, end: networkEnd}, as: {asn, name: asName, country: asCountry} };
 }
 
 /**
