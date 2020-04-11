@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import sys, gzip, json, ipaddress, re, os, requests
-
+import sys, gzip, json, ipaddress, re, os, requests, toml
+from typing import Dict, List, Any
 
 """
 Number of most significant bits used to partition the lookup db. Each partition is stored as one key/value pair in
@@ -16,11 +16,11 @@ V6_PREFIX_LEN = 24
 
 
 """
-Splits up all entries into partitions, with each partition containing all ip entries that have the same first n bits
+Splits up all entries into ip partitions, with each partition containing all ip entries that have the same first n bits
 (determined by V4_PREFIX_LEN or V6_PREFIX_LEN), and returns the partitions as an array of key/value pairs
 """
-def create_kv_partitions(entries):
-    chunks = {}
+def create_kv_ip_partitions(entries):
+    partitions = {}
     for entry in entries:
         start_ip = ipaddress.ip_address(entry["s"])
         start_ip_int = int(start_ip)
@@ -39,14 +39,42 @@ def create_kv_partitions(entries):
         # 1.1.1.1 needs to be able to find the lookup key corresponding to it
         for i in range(0, 1 + part_end - part_start):
             key = "m%d/v%d/%d" % (partition_prefix_len, start_ip.version, part_start+i)
-            if key not in chunks:
+            if key not in partitions:
                 arr = []
-                chunks[key] = arr
+                partitions[key] = arr
             else:
-                arr = chunks[key]
+                arr = partitions[key]
             arr.append(entry)
 
-    return sorted([{"key": k, "value": json.dumps(v, separators=(',', ':'))} for k, v in chunks.items()],
+    return sorted([{"key": k, "value": json.dumps(v, separators=(',', ':'))} for k, v in partitions.items()],
+                  key=lambda x: int(x["key"].split("/")[2]))
+
+
+"""
+Creates a partition for every ASN, with each partition containing the list of all IP subnets against that AS
+"""
+def create_kv_asn_partitions(entries):
+    partitions = {}
+    for entry in entries:
+        start_ip = str(ipaddress.ip_address(entry["s"]))
+        end_ip   = str(ipaddress.ip_address(entry["e"] if '.' in start_ip else v6_uncompress(entry["e"])))
+        asn      = entry["a"]
+        country  = entry["c"]
+        name     = entry["n"]
+        key      = "asn/v1/%d" % asn
+
+        if key in partitions:
+            asn_obj = partitions[key]
+        else:
+            asn_obj = { "as": { "asn": asn, "country": country, "name": name }, "networks": [] }
+            partitions[key] = asn_obj
+
+        if asn_obj["as"]["name"] != name or asn_obj["as"]["country"] != country:
+            print("mismatching in AS %d %s: %s != %s; %s != %s" %
+                  (asn, start_ip, asn_obj["as"]["name"], name, asn_obj["as"]["country"], country), file=sys.stderr)
+        asn_obj["networks"].append({ "start": start_ip, "end": end_ip })
+
+    return sorted([{"key": k, "value": json.dumps(v, separators=(',', ':'))} for k, v in partitions.items()],
                   key=lambda x: int(x["key"].split("/")[2]))
 
 
@@ -136,32 +164,32 @@ def main():
         print("usage: %s <path/to/ip-db.tsv.gz> [... <db2.gz>]" % sys.argv[0], file=sys.stderr)
         sys.exit(1)
 
-    cf_account_id = os.getenv('CF_ACCOUNT_ID')
-    cf_namespace_id = os.getenv('CF_NAMESPACE_ID')
-    cf_email = os.getenv('CF_AUTH_EMAIL')
-    cf_key = os.getenv('CF_AUTH_KEY')
+    wr = toml.load("wrangler.toml")
+    cf_account_id = wr["account_id"]
+    cf_namespace_id = wr["kv-namespaces"][0]["id"]
+    cf_key = toml.load(os.path.join(os.getenv('HOME'),'.wrangler/config/default.toml')).get('api_token')
 
-    if not cf_account_id or not cf_namespace_id or not cf_email or not cf_key:
+    if not cf_account_id or not cf_namespace_id or not cf_key:
         print("error: cloudflare credentials not set up in env", file=sys.stderr)
         sys.exit(1)
 
     ip_entries = [item for sublist in map(lambda tsv: read_ip_db(tsv), sys.argv[1:]) for item in sublist]
-    partitions = create_kv_partitions(ip_entries)
 
     cf_batch_size = 9900
-    for i in range(0, len(partitions), cf_batch_size):
-        batch = partitions[i:i+cf_batch_size]
-        body = json.dumps(batch, separators=(',', ':'))
-        print("Uploading batch of %d entries of total size %d" % (len(batch), len(body)))
-        url = "https://api.cloudflare.com/client/v4/accounts/%s/storage/kv/namespaces/%s/bulk" \
-              % (cf_account_id, cf_namespace_id)
-        headers = {
-            'content-type': 'application/json',
-            'X-Auth-Key': cf_key,
-            'X-Auth-Email': cf_email
-        }
-        requests.put(url, body, headers=headers).raise_for_status()
-        print("Done")
+    for partitions in [create_kv_ip_partitions(ip_entries), create_kv_asn_partitions(ip_entries)]:
+    #for partitions in [create_kv_asn_partitions(ip_entries)]:
+        for i in range(0, len(partitions), cf_batch_size):
+            batch = partitions[i:i+cf_batch_size]
+            body = json.dumps(batch, separators=(',', ':'))
+            print("Uploading batch of %d entries of total size %d" % (len(batch), len(body)))
+            url = "https://api.cloudflare.com/client/v4/accounts/%s/storage/kv/namespaces/%s/bulk" \
+                  % (cf_account_id, cf_namespace_id)
+            headers = {
+                'content-type': 'application/json',
+                'Authorization': "Bearer %s" % cf_key
+            }
+            requests.put(url, body, headers=headers).raise_for_status()
+            print("Done")
 
 if __name__ == "__main__":
     main()
