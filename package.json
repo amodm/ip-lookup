@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Amod Malviya <amod@rootnet.in>",
-  "license": "MIT",
+  "license": "(MIT OR Apache-2.0)",
   "devDependencies": {
     "@cloudflare/workers-types": "^3.18.0",
     "@typescript-eslint/eslint-plugin": "^5.42.0",
