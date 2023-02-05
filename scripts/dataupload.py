@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, gzip, json, ipaddress, re, os, requests, toml
+import sys, gzip, json, ipaddress, re, pathlib
 from typing import Dict, List, Any
 
 """
@@ -156,6 +156,12 @@ def test_ip_lookup(ip_addr, partitions):
                                 "a":e["a"], "c":e["c"], "n":e["n"]}
 
 
+def write_kv_upload_file(partitions, name):
+    with open(name, "w") as fp:
+        json.dump(partitions, fp, separators=(',', ':'))
+    print(f"{name} : wrote {len(partitions)} entries")
+
+
 """
 Main entry point
 """
@@ -164,32 +170,20 @@ def main():
         print("usage: %s <path/to/ip-db.tsv.gz> [... <db2.gz>]" % sys.argv[0], file=sys.stderr)
         sys.exit(1)
 
-    wr = toml.load("wrangler.toml")
-    cf_account_id = wr["account_id"]
-    cf_namespace_id = wr["kv-namespaces"][0]["id"]
-    cf_key = toml.load(os.path.join(os.getenv('HOME'),'.wrangler/config/default.toml')).get('api_token')
-
-    if not cf_account_id or not cf_namespace_id or not cf_key:
-        print("error: cloudflare credentials not set up in env", file=sys.stderr)
-        sys.exit(1)
-
     ip_entries = [item for sublist in map(lambda tsv: read_ip_db(tsv), sys.argv[1:]) for item in sublist]
 
-    cf_batch_size = 9900
-    for partitions in [create_kv_ip_partitions(ip_entries), create_kv_asn_partitions(ip_entries)]:
-    #for partitions in [create_kv_asn_partitions(ip_entries)]:
-        for i in range(0, len(partitions), cf_batch_size):
-            batch = partitions[i:i+cf_batch_size]
-            body = json.dumps(batch, separators=(',', ':'))
-            print("Uploading batch of %d entries of total size %d" % (len(batch), len(body)))
-            url = "https://api.cloudflare.com/client/v4/accounts/%s/storage/kv/namespaces/%s/bulk" \
-                  % (cf_account_id, cf_namespace_id)
-            headers = {
-                'content-type': 'application/json',
-                'Authorization': "Bearer %s" % cf_key
-            }
-            requests.put(url, body, headers=headers).raise_for_status()
-            print("Done")
+    data_dir = pathlib.Path(__file__).parent.parent.joinpath("data")
+    kv_ips_json = data_dir.joinpath("kv-ips.json")
+    kv_asns_json = data_dir.joinpath("kv-asns.json")
+
+    write_kv_upload_file(create_kv_ip_partitions(ip_entries), kv_ips_json)
+    write_kv_upload_file(create_kv_asn_partitions(ip_entries), kv_asns_json)
+
+    print("")
+    print("Bulk upload files created. You may now upload using the following commands:")
+    print(f"  wrangler kv:bulk put --binding IP2NETWORK --preview false {kv_ips_json}")
+    print(f"  wrangler kv:bulk put --binding IP2NETWORK --preview false {kv_asns_json}")
+
 
 if __name__ == "__main__":
     main()
