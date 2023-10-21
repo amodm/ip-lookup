@@ -12,11 +12,11 @@
   "author": "Amod Malviya <amod@rootnet.in>",
   "license": "(MIT OR Apache-2.0)",
   "devDependencies": {
-    "@cloudflare/workers-types": "^3.18.0",
-    "@typescript-eslint/eslint-plugin": "^5.42.0",
-    "@typescript-eslint/parser": "^5.42.0",
-    "eslint": "^8.26.0",
-    "typescript": "^4.8.4",
-    "wrangler": "3.1.1"
+    "@cloudflare/workers-types": "^4.20231016.0",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.52.0",
+    "typescript": "^5.2.2",
+    "wrangler": "3.14.0"
   }
 }
