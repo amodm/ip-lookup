@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "ip-lookup",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A cloudflare workers based free ip network lookup service",
   "scripts": {
     "start": "wrangler dev",
@@ -12,11 +12,11 @@
   "author": "Amod Malviya <amod@rootnet.in>",
   "license": "(MIT OR Apache-2.0)",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20231016.0",
-    "@typescript-eslint/eslint-plugin": "^6.8.0",
-    "@typescript-eslint/parser": "^6.8.0",
-    "eslint": "^8.52.0",
-    "typescript": "^5.2.2",
-    "wrangler": "3.22.1"
+    "@cloudflare/workers-types": "^4.20240614.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.1",
+    "@typescript-eslint/parser": "^7.13.1",
+    "eslint": "^8.56.0",
+    "typescript": "^5.4.5",
+    "wrangler": "3.61.0"
   }
 }
