@@ -181,8 +181,8 @@ def main():
 
     print("")
     print("Bulk upload files created. You may now upload using the following commands:")
-    print(f"  wrangler kv:bulk put --binding IP2NETWORK --preview false {kv_ips_json}")
-    print(f"  wrangler kv:bulk put --binding IP2NETWORK --preview false {kv_asns_json}")
+    print(f"  pnpm exec wrangler kv bulk put --binding IP2NETWORK --remote --preview false {kv_ips_json}")
+    print(f"  pnpm exec wrangler kv bulk put --binding IP2NETWORK --remote --preview false {kv_asns_json}")
 
 
 if __name__ == "__main__":
