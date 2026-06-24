@@ -124,14 +124,20 @@ def read_ip_db(tsv_file):
 Compresses an IPv6 address that trails with :ffff
 """
 def v6_compress(ip):
-    return re.sub(r'(:ffff)+$', ':X', ip)
+    def repl(m):
+        n = m.group(0).count('ffff')
+        return ':X' if n == 1 else f':{n}X'
+    return re.sub(r'(:ffff)+$', repl, ip)
 
 
 """
 Uncompresses an IPv6 address that may have been compressed
 """
 def v6_uncompress(ip):
-    return ip.replace('X', ':'.join(['ffff']*(8-ip.count(':'))))
+    def repl(m):
+        n = int(m.group(1)) if m.group(1) else 1
+        return ':'.join(['ffff'] * n)
+    return re.sub(r'(\d*)X', repl, ip)
 
 
 """

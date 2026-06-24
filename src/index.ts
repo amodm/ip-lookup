@@ -226,10 +226,11 @@ function ipv4stoi(ip: string): number {
 }
 
 /**
- * Uncompresses an IPv6 representation, where we may have replaced :ffff with X to save space
+ * Uncompresses an IPv6 representation, where we may have replaced a trailing run of
+ * :ffff groups with [count]X to save space (e.g. ::X = ::ffff, ::2X = ::ffff:ffff)
  */
 function v6Uncompress(ip: string): string {
-	return ip.replace('X', Array(8 - (ip.match(/:/g) || []).length).fill('ffff').join(':'))
+	return ip.replace(/(\d*)X/g, (_, n) => Array(n ? parseInt(n, 10) : 1).fill('ffff').join(':'))
 }
 
 /**
